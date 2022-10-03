@@ -33,7 +33,7 @@ namespace GetPostRequests.Servise
         //       "26414:0I45pYUJ@195.123.193.127:2831",
         //       "26414:0I45pYUJ@195.123.194.209:2831",
         //       "26414:0I45pYUJ@195.123.252.241:2831", на розетке пока не робе!
-        public List<Videocard> GetTotalPages()
+        public List<Videocard> GetVideocardsFromRozetka()
         {
             var proxy = new WebProxy("195.123.255.56:2831", false);
             proxy.Credentials = new NetworkCredential("26414", "0I45pYUJ");
@@ -49,7 +49,7 @@ namespace GetPostRequests.Servise
             List<Videocard> result = new List<Videocard>();
             return result = GetPriseAndDiscriptions(3, proxy);
         }
-        public List<Videocard> GetPriseAndDiscriptions (int totalPages, WebProxy proxy) // Html body requests
+        private List<Videocard> GetPriseAndDiscriptions (int totalPages, WebProxy proxy) // Html body requests
         {
             RestClientOptions options = new RestClientOptions();
             options.BaseUrl = new Uri("https://hard.rozetka.com.ua");
@@ -103,7 +103,7 @@ namespace GetPostRequests.Servise
             return result;
             
         }
-        public List<Videocard> GetCharacteristics (List<Videocard> videocards, WebProxy proxy)
+        private List<Videocard> GetCharacteristics (List<Videocard> videocards, WebProxy proxy)
         {
             foreach (var item in videocards)
             {

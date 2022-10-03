@@ -1,25 +1,17 @@
 ﻿using GetPostRequests.EntityFramework;
 using GetPostRequests.Models;
 using GetPostRequests.Servise;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
-var listVideocards = new List<Videocard>();
-using (ApplicationDBContextJson db = new ApplicationDBContextJson())
-{
-    var takeFromJsonDb = db.Videocards.ToList();
-    foreach (var item in takeFromJsonDb)
-    {
-        var deserialize = JsonSerializer.Deserialize<Videocard>(item.FullJsonVideocard);
-        listVideocards.Add(deserialize);
-    }    
-    
-}
+var videocards = new List<Videocard>();
+GetRequest requestToBodyHtml = new GetRequest();
+videocards = requestToBodyHtml.GetVideocardsFromRozetka();
 using (ApplicationDb db = new ApplicationDb())
 {
-    AddToDbProduct addToDb = new AddToDbProduct();
-    addToDb.AddToDb(db, listVideocards);
+    AddToDbProduct addToDbProduct = new AddToDbProduct();
+    addToDbProduct.AddToDb(db, videocards);
 }
-
 Console.ReadLine();
 
 
