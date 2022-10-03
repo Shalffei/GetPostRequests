@@ -5,6 +5,8 @@ using System.Net;
 using HtmlAgilityPack;
 using System.Web;
 using System.Xml.Linq;
+using GetPostRequests.EntityFramework;
+using System.Linq;
 
 namespace GetPostRequests.Servise
 {
@@ -33,7 +35,7 @@ namespace GetPostRequests.Servise
         //       "26414:0I45pYUJ@195.123.193.127:2831",
         //       "26414:0I45pYUJ@195.123.194.209:2831",
         //       "26414:0I45pYUJ@195.123.252.241:2831", на розетке пока не робе!
-        public List<Videocard> GetVideocardsFromRozetka()
+        public List<Videocard> GetVideocardsFromRozetka() //getting total pages 
         {
             var proxy = new WebProxy("195.123.255.56:2831", false);
             proxy.Credentials = new NetworkCredential("26414", "0I45pYUJ");
@@ -44,8 +46,7 @@ namespace GetPostRequests.Servise
             var request = new RestRequest("/v4/goods/get", Method.Get);
             request.AddParameter("category_id", "80087");
             var response = client.Execute(request);
-            RootIds myDeserializedClass = JsonSerializer.Deserialize<RootIds>(response.Content);
-            //pase get here*
+            //pase get request here*
             List<Videocard> result = new List<Videocard>();
             return result = GetPriseAndDiscriptions(3, proxy);
         }
@@ -57,25 +58,38 @@ namespace GetPostRequests.Servise
             var client = new RestClient(options);
             var request = new RestRequest("/ua/videocards/c80087/", Method.Get);
             var response = client.Execute(request);
+            HashSet<int?> idsInDb = new HashSet<int?>();
+            using (ApplicationDb db = new ApplicationDb())
+            {
+                idsInDb = db.Products.Select(x => x.IdRozetka).ToHashSet();
+            }
             HtmlDocument document = new HtmlDocument();
             document.LoadHtml(response.Content);
             var obj = document.DocumentNode.SelectNodes("//div[@class = 'goods-tile__inner']");
             List<Videocard> videocards = new List<Videocard>();
             foreach (var item in obj)
             {
-                Videocard videocard = new Videocard();
-                HtmlDocument htmlDocument = new HtmlDocument();
-                htmlDocument.LoadHtml(item.InnerHtml);
-                var priceHtml = htmlDocument.DocumentNode.SelectSingleNode("//span[@class = 'goods-tile__price-value']").InnerHtml.ToString();
-                var decodePrice = HttpUtility.HtmlDecode(priceHtml).Replace(Convert.ToChar(160).ToString(), "").Trim();
-                videocard.Price = Convert.ToDecimal(decodePrice);
-                var refHtml = htmlDocument.DocumentNode.SelectSingleNode("//a[@class='goods-tile__heading ng-star-inserted']");
-                videocard.ReferenceToCharacteristics = refHtml.Attributes.Where(x => x.Name == "href").Select(x => x.Value).FirstOrDefault();
-                videocard.Name = refHtml.Attributes.Where(x => x.Name == "title").Select(x => x.Value).FirstOrDefault();
-                var idHtml = item.Attributes.Where(x => x.Name == "data-goods-id").Select(x => x.Value).FirstOrDefault();
-                videocard.Id = Convert.ToInt32(idHtml);
+                foreach (var Id in idsInDb)
+                {
+                    if (item.Attributes.Where(x => x.Name == "data-goods-id").Select(x => Convert.ToInt32(x.Value)).FirstOrDefault() == Id)
+                        continue;
 
-                videocards.Add(videocard);
+                    else
+                    {
+                        Videocard videocard = new Videocard();
+                        HtmlDocument htmlDocument = new HtmlDocument();
+                        htmlDocument.LoadHtml(item.InnerHtml);
+                        var priceHtml = htmlDocument.DocumentNode.SelectSingleNode("//span[@class = 'goods-tile__price-value']").InnerHtml.ToString();
+                        var decodePrice = HttpUtility.HtmlDecode(priceHtml).Replace(Convert.ToChar(160).ToString(), "").Trim();
+                        videocard.Price = Convert.ToDecimal(decodePrice);
+                        var refHtml = htmlDocument.DocumentNode.SelectSingleNode("//a[@class='goods-tile__heading ng-star-inserted']");
+                        videocard.ReferenceToCharacteristics = refHtml.Attributes.Where(x => x.Name == "href").Select(x => x.Value).FirstOrDefault();
+                        videocard.Name = refHtml.Attributes.Where(x => x.Name == "title").Select(x => x.Value).FirstOrDefault();
+                        var idHtml = item.Attributes.Where(x => x.Name == "data-goods-id").Select(x => x.Value).FirstOrDefault();
+                        videocard.Id = Convert.ToInt32(idHtml);
+                        videocards.Add(videocard);
+                    }
+                }
             }
             for (int i = 2; i <= totalPages; i++)
             {
@@ -85,18 +99,27 @@ namespace GetPostRequests.Servise
                 obj = document.DocumentNode.SelectNodes("//div[@class = 'goods-tile__inner']");
                 foreach (var item in obj)
                 {
-                    Videocard videocard = new Videocard();
-                    HtmlDocument htmlDocument = new HtmlDocument();
-                    htmlDocument.LoadHtml(item.InnerHtml);
-                    var priceHtml = item.SelectSingleNode("//span[@class = 'goods-tile__price-value']").InnerHtml.ToString();
-                    var decodePrice = HttpUtility.HtmlDecode(priceHtml).Replace(Convert.ToChar(160).ToString(), "").Trim();
-                    videocard.Price = Convert.ToDecimal(decodePrice);
-                    var refHtml = item.SelectSingleNode("//a[@class='goods-tile__heading ng-star-inserted']");
-                    videocard.ReferenceToCharacteristics = refHtml.Attributes.Where(x => x.Name == "href").Select(x => x.Value).FirstOrDefault();
-                    videocard.Name = refHtml.Attributes.Where(x => x.Name == "title").Select(x => x.Value).FirstOrDefault();
-                    var idHtml = item.Attributes.Where(x => x.Name == "data-goods-id").Select(x => x.Value).FirstOrDefault();
-                    videocard.Id = Convert.ToInt32(idHtml);
-                    videocards.Add(videocard);
+                    foreach (var Id in idsInDb)
+                    {
+                        if (item.Attributes.Where(x => x.Name == "data-goods-id").Select(x => Convert.ToInt32(x.Value)).FirstOrDefault() == Id)
+                            continue;
+
+                        else
+                        {
+                            Videocard videocard = new Videocard();
+                            HtmlDocument htmlDocument = new HtmlDocument();
+                            htmlDocument.LoadHtml(item.InnerHtml);
+                            var priceHtml = htmlDocument.DocumentNode.SelectSingleNode("//span[@class = 'goods-tile__price-value']").InnerHtml.ToString();
+                            var decodePrice = HttpUtility.HtmlDecode(priceHtml).Replace(Convert.ToChar(160).ToString(), "").Trim();
+                            videocard.Price = Convert.ToDecimal(decodePrice);
+                            var refHtml = htmlDocument.DocumentNode.SelectSingleNode("//a[@class='goods-tile__heading ng-star-inserted']");
+                            videocard.ReferenceToCharacteristics = refHtml.Attributes.Where(x => x.Name == "href").Select(x => x.Value).FirstOrDefault();
+                            videocard.Name = refHtml.Attributes.Where(x => x.Name == "title").Select(x => x.Value).FirstOrDefault();
+                            var idHtml = item.Attributes.Where(x => x.Name == "data-goods-id").Select(x => x.Value).FirstOrDefault();
+                            videocard.Id = Convert.ToInt32(idHtml);
+                            videocards.Add(videocard);
+                        }
+                    }
                 }
             }
             List <Videocard> result = GetCharacteristics(videocards, proxy);
